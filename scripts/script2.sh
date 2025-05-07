@@ -1,3 +1,3 @@
 #!/bin/bash
-echo "=== GPU Info ==="
-lspci | grep -i "3D\|VGA"
+echo "=== Kernel Version ==="
+uname -r

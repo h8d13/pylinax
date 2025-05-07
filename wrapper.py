@@ -8,11 +8,9 @@ import random, uuid
 head_dir="./.hl"
 head_file=f"{head_dir}/.head"
 head_reqs=f"./.reqs.hl"
-script_dir = "./scripts"
 
 ######################################
 os.makedirs(head_dir, exist_ok=True)
-os.makedirs(script_dir, exist_ok=True)
 y = uuid.uuid4()
 x = str(y.int)[:6]
 
@@ -67,8 +65,9 @@ if is_algod:
         subprocess.run([f"/usr/games/cowsay", str({is_user})], stdout=open("output.txt", "w"))
         subprocess.run(["echo", "Hello",str(random.randint(0, 31))], stdout=open("output.txt", "a"))
 
-        from wmain import say_hello, _exec_scripts
+        from wmain import say_hello, check_home, _exec_scripts
         say_hello()
+        check_home()
         _exec_scripts()
 
         # Optional: uninstall
