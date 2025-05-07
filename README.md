@@ -8,4 +8,4 @@
   - Mark installations
   - Mark already installed
 - Run bin `./scripts` alphabetically
-- Signle entry-point that takes perms as prefix (arg1) `./run.sh sudo`
+- Single entry-point that takes perms as prefix (arg1) `./run.sh sudo`
