@@ -65,9 +65,10 @@ if is_algod:
         subprocess.run([f"/usr/games/cowsay", str({is_user})], stdout=open("output.txt", "w"))
         subprocess.run(["echo", "Hello",str(random.randint(0, 31))], stdout=open("output.txt", "a"))
 
-        from wmain import say_hello, check_home, _exec_scripts
+        from wmain import say_hello, check_home, check_hw, _exec_scripts
         say_hello()
         check_home()
+        check_hw()
         _exec_scripts()
 
         # Optional: uninstall
