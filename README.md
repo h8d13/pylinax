@@ -12,3 +12,14 @@
 - Single entry-point that takes perms as prefix (arg1)
 Ex: `./run.sh sudo`
 
+---
+
+### End goal
+
+Can customize a script to simply check it's in the right environment before running. 
+
+For example:
+- Check we have a home dir for the user
+- Check lspci outputs or needed HW probes
+- Then run appropriate scripts
+  
