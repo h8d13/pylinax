@@ -6,9 +6,13 @@ import subprocess, os
 import random, uuid
 
 head_dir="./.hl"
-head_reqs=f"./.reqs.hl"
-os.makedirs(head_dir, exist_ok=True)
 head_file=f"{head_dir}/.head"
+head_reqs=f"./.reqs.hl"
+script_dir = "./scripts"
+
+######################################
+os.makedirs(head_dir, exist_ok=True)
+os.makedirs(script_dir, exist_ok=True)
 y = uuid.uuid4()
 x = str(y.int)[:6]
 
@@ -56,15 +60,16 @@ if is_algod:
                     print(f"Already installed: {pack}")
                     with open(head_file, "a") as f:
                         status = 1
-                        f.write(f"MN:{x} - {pack}: 1\n")
+                        f.write(f"MN:000000 - {pack}: 1\n")
 
 
         ## Example work
         subprocess.run([f"/usr/games/cowsay", str({is_user})], stdout=open("output.txt", "w"))
-        subprocess.run(["echo", str(random.randint(0, 31))], stdout=open("output.txt", "a"))
+        subprocess.run(["echo", "Hello",str(random.randint(0, 31))], stdout=open("output.txt", "a"))
 
-        from wmain import say_hello
+        from wmain import say_hello, _exec_scripts
         say_hello()
+        _exec_scripts()
 
         # Optional: uninstall
         # for pack in packs:
