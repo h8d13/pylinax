@@ -1,10 +1,7 @@
 import subprocess, os
 from pack.hw import get_cpu, get_gpu, get_mem, get_ker, get_usr
 from pack.env import is_t_usr
-
-script_dir= "./scripts"
-######################################
-os.makedirs(script_dir, exist_ok=True)
+from pack.lookup import script_dir
 
 def check_home():
     home_dir=f"/home/{is_t_usr}"
@@ -12,7 +9,7 @@ def check_home():
 
     if os.path.isdir(home_dir):  # Check if the directory exists
         print(f"Home directory '{home_dir}' exists.")
-        subprocess.run(["ls", home_dir])
+        #subprocess.run(["ls", home_dir])
     else:
         print(f"Home directory '{home_dir}' does not exist or is incorrect.")
 
