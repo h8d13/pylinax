@@ -6,11 +6,10 @@ import platform
 
 ### ADMIN + USER ###
 is_admin = None
+is_t_usr = (os.getlogin())
 
 if os.getuid() == 0:
     is_admin = True
-    is_t_usr = (os.getlogin())
-    print(f"Target user? {is_t_usr}.")
 else:
     is_admin = False
     print(f"Admin? {is_admin}. Please run elevated.")

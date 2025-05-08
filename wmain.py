@@ -6,7 +6,7 @@ script_dir= "./scripts"
 ######################################
 os.makedirs(script_dir, exist_ok=True)
 
-usr_info = get_usr()
+usr_info=get_usr()
 
 def say_hello():    
     subprocess.run(["echo", "Hello", usr_info])

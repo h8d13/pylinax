@@ -15,10 +15,6 @@ y = uuid.uuid4()
 x = str(y.int)[:6]
 
 is_algod = is_admin and is_system == "Linux" 
-# If making user changes make sure to give back all perms.
-
-# If making root changes do them after user changes and giving back ownership 
-
 print(f"EL: {is_algod}")
 
 if is_algod:
@@ -65,14 +61,23 @@ if is_algod:
                         f.write(f"MN:000000 - {pack}: 1\n")
 
 
+        from wmain import say_hello, check_home, check_hw, _exec_scripts
+        say_hello()
+        check_home()
+
+        # If making user changes make sure to give back all perms.
+        #######################################
+        # If making root changes do them after user changes and giving back ownership 
+        # Could for example write scripts as u_1 to u_x, then perms (see snippet bellow), then z_1 to z_x root changes.
+        ## chown -R $TARGET_USER:$TARGET_USER /home/$TARGET_USER/
+        # And prereqs can be 0 or a. 
+
+        check_hw()
+        
         ## Example work
         subprocess.run([f"/usr/games/cowsay", "Hellooo"], stdout=open("output.txt", "w"))
         subprocess.run(["echo", "Hmmoo",str(random.randint(0, 31))], stdout=open("output.txt", "a"))
 
-        from wmain import say_hello, check_home, check_hw, _exec_scripts
-        say_hello()
-        check_home()
-        check_hw()
         _exec_scripts() 
 
         # Optional: uninstall
