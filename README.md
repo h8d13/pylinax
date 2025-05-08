@@ -26,7 +26,8 @@ Ex: `./run.sh sudo`
 Can customize a script to simply check it's in the right environment before running. 
 
 For example:
+- Platform types
 - Check we have a home dir for the user
 - Check lspci outputs or needed HW probes
 - Then run appropriate scripts
-  
+
