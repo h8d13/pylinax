@@ -22,6 +22,13 @@ def get_mem():
     return mem_info
 
 def get_usr():
-    usr_info = subprocess.check_output("whoami", shell=True).decode('utf-8')
+    usr_info = subprocess.check_output("whoami", shell=True).decode('utf-8').strip()
+    if usr_info == "root":
+        is_root = True
+    else:
+        is_root = False
+        
     print(f"USR: {usr_info}")
-    return usr_info
+    print(f"ROOT: {is_root}")
+
+    return usr_info, is_root

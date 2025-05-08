@@ -14,8 +14,9 @@ os.makedirs(head_dir, exist_ok=True)
 y = uuid.uuid4()
 x = str(y.int)[:6]
 
-is_algod = is_admin and is_system == "Linux" 
-print(f"EL: {is_algod}")
+is_algod = is_admin and is_system == "Linux"
+# can add conditions for run here ^^
+#print(f"EL: {is_algod}")
 
 if is_algod:
     dist_val = get_os_fields("ID")
@@ -61,18 +62,18 @@ if is_algod:
                         f.write(f"MN:000000 - {pack}: 1\n")
 
 
-        from wmain import say_hello, check_home, check_hw, _exec_scripts
-        say_hello()
-        check_home()
+        from wmain import check_home, check_hw, _exec_scripts
+        check_hw()
+        # Perform actions based on hardware
 
+        check_home()
         # If making user changes make sure to give back all perms.
         #######################################
         # If making root changes do them after user changes and giving back ownership 
+        # Prereqs can be 0 or a.  
         # Could for example write scripts as u_1 to u_x, then perms (see snippet bellow), then z_1 to z_x root changes.
+        ## Simple do all user home work then give back recursive. 
         ## chown -R $TARGET_USER:$TARGET_USER /home/$TARGET_USER/
-        # And prereqs can be 0 or a. 
-
-        check_hw()
         
         ## Example work
         subprocess.run([f"/usr/games/cowsay", "Hellooo"], stdout=open("output.txt", "w"))
@@ -80,7 +81,7 @@ if is_algod:
 
         _exec_scripts() 
 
-        # Optional: uninstall
+        # Optional: uninstall for packages only needed once
         # for pack in packs:
         #     subprocess.run([pm_info["pm"], pm_info["remove"], pm_info["args"], pack])
         #      with open("./.hl/.head", "a") as f:
@@ -91,4 +92,4 @@ if is_algod:
         print("Not implemented for this distro family.")
 
 else:
-    print("Run as root on a Linux system.")
+    print("Run as admin/root on a Linux system.")

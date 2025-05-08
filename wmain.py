@@ -6,17 +6,12 @@ script_dir= "./scripts"
 ######################################
 os.makedirs(script_dir, exist_ok=True)
 
-usr_info=get_usr()
-
-def say_hello():    
-    subprocess.run(["echo", "Hello", usr_info])
-
 def check_home():
     home_dir=f"/home/{is_t_usr}"
-    print(f"Target user? {is_t_usr}.")
+    print(f"Target user: {is_t_usr}")
 
     if os.path.isdir(home_dir):  # Check if the directory exists
-        print(f"Home directory '{home_dir}' exists and is the correct target.")
+        print(f"Home directory '{home_dir}' exists.")
         subprocess.run(["ls", home_dir])
     else:
         print(f"Home directory '{home_dir}' does not exist or is incorrect.")
@@ -26,6 +21,7 @@ def check_hw():
     get_gpu()
     get_ker()
     get_mem()
+    get_usr()
 
 def _exec_scripts():
     ## Execute Shell Scripts
