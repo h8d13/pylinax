@@ -8,6 +8,13 @@
 - Parse `reqs.hl` file
   - Mark installations
   - Mark already installed
+Format similar to `requirements.txt`:
+```
+cowsay
+util-linux
+pciutils
+```
+
 - Run bin `./scripts` alphabetically
 - Single entry-point that takes perms as prefix (arg1)
 Ex: `./run.sh sudo`
