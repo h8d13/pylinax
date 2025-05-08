@@ -1,4 +1,4 @@
-# pylinax
+# pylinax v25.05
 
 ## Define what
 - Lookup table: Alpine, Deb, Arch
