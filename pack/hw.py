@@ -20,3 +20,8 @@ def get_mem():
     mem_info = subprocess.check_output("lsblk", shell=True).decode('utf-8')
     print(f"Detected MEM: {mem_info}")
     return mem_info
+
+def get_usr():
+    usr_info = subprocess.check_output("whoami", shell=True).decode('utf-8')
+    print(f"USR: {usr_info}")
+    return usr_info

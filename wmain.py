@@ -1,16 +1,20 @@
 import subprocess, os
-from pack.env import is_user
-from pack.hw import get_cpu, get_gpu, get_mem, get_ker
+from pack.hw import get_cpu, get_gpu, get_mem, get_ker, get_usr
+from pack.env import is_t_usr
 
 script_dir= "./scripts"
-home_dir=f"/home/{is_user}"
 ######################################
 os.makedirs(script_dir, exist_ok=True)
 
-def say_hello():
-    subprocess.run(["echo", "Hello", is_user])
+usr_info = get_usr()
+
+def say_hello():    
+    subprocess.run(["echo", "Hello", usr_info])
 
 def check_home():
+    home_dir=f"/home/{is_t_usr}"
+    print(f"Target user? {is_t_usr}.")
+
     if os.path.isdir(home_dir):  # Check if the directory exists
         print(f"Home directory '{home_dir}' exists and is the correct target.")
         subprocess.run(["ls", home_dir])
