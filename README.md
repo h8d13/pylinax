@@ -16,8 +16,10 @@ pciutils
 ```
 
 - Run bin `./scripts` alphabetically
-- Single entry-point that takes perms as prefix (arg1)
+- Single entry-point that takes perms as postfix (arg1)
 Ex: `./run.sh sudo`
+
+My thought is that then it would work with doas, or any other permissions framework. 
 
 ---
 
