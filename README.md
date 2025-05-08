@@ -19,8 +19,6 @@ pciutils
 - Single entry-point that takes perms as postfix (arg1)
 Ex: `./run.sh sudo`
 
-My thought is that then it would work with doas, or any other permissions framework. 
-
 ---
 
 ### End goal
@@ -28,8 +26,11 @@ My thought is that then it would work with doas, or any other permissions framew
 Can customize a script to simply check it's in the right environment before running. 
 
 For example:
-- Platform types
-- Check we have a home dir for the user
+- Package manager > Distro
 - Check lspci outputs or needed HW probes
+- Check we have a home dir for the user
 - Then run appropriate scripts
-
+  - Logical flow for scripts 
+    - Make user changes first + Chown
+    - Then root changes
+    - Then any major and proper clean + reboot
