@@ -4,6 +4,9 @@ import os
 import subprocess
 import uuid
 
+#Linker
+## Hw > Distro > Pkg > Script 
+
 # Unified structure for package manager operations
 pkg_managers = {
     "debian": {
