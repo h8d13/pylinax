@@ -28,6 +28,9 @@ Can customize a script to simply check it's in the right environment before runn
 For example:
 - Package manager > Distro
 - Check lspci outputs or needed HW probes (handle edge cases)
+  
+> Perform installs based on results
+
 - Check we have a home dir for the user
 - Then run appropriate scripts
   - Logical flow for scripts 
