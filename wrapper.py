@@ -1,8 +1,8 @@
 #!/bin/python3
 ## wrapper.py
 from pack.env import is_admin, is_system, is_t_usr
-from pack.lookup import install_packs, x
 from pack.hw import get_usr
+from pack.lookup import install_packs, x
 import subprocess
 
 usr_info, is_root = get_usr() 
