@@ -1,68 +1,48 @@
 #!/usr/bin/env bash
 
-# ------------------ Configurable Constants ------------------
-KEYMAP="us"
-TIMEZONE="Europe/London"
+# ------------------ Config Constants ------------------
 LOCALE="en_US.UTF-8 UTF-8"
 LANG="LANG=en_US.UTF-8"
-HOSTNAME="artix"
+TIMEZONE="Europe/Berlin"
 SWAP_SIZE_GB=2
-WIPE_DISK=true
-USE_IPV6_PRIVACY=true
+PACKAGES_BASE="base base-devel openrc elogind-openrc linux linux-firmware git man-db iptables-nft bc udev ntp networkmanager-openrc grub efibootmgr os-prober mtools dosfstools"
+USERNAME=""
+USERPASS=""
+ROOTPASS=""
 
-BASE_PKGS="base openrc elogind-openrc linux linux-firmware git man-db iptables-nft"
-DEV_PKGS="base-devel bc"
-EXTRA_PKGS="networkmanager-openrc grub efibootmgr os-prober mtools dosfstools fastfetch htop neovim"
-
-# ------------------ Pre-Setup ------------------
-loadkeys "$KEYMAP"
-echo "=== Minimal Artix Installer ==="
-
-fdisk -l
-read -rp "Target disk (e.g. /dev/sda): " disk
-read -rp "Continue and install to $disk? This will ERASE ALL DATA. (y/N): " confirm
-[[ "${confirm,,}" != "y" ]] && exit 1
-
-read -rsp "Set root password: " rootpw; echo
-read -rp "New username: " username
-read -rsp "Password for $username: " userpw; echo
-
-username="${username,,}"
-HOSTNAME="${HOSTNAME,,}"
-disk0="$disk"
-[[ "$disk" =~ nvme0n|mmcblk ]] && disk="${disk}p"
-
-# ------------------ Boot Detection ------------------
-boot=legacy
-[ -d /sys/firmware/efi ] && boot=uefi
+# ------------------ Input: Disk, User, Passwords ------------------
+loadkeys us
+clear
+echo "Available Disks:"
+lsblk -d -e7 -o NAME,SIZE,MODEL
+read -rp "Target disk (e.g. /dev/sda): " DISK
+read -rp "Confirm you want to format $DISK (yes/NO): " CONFIRM
+[[ "$CONFIRM" != "yes" ]] && echo "Aborted." && exit 1
+read -rp "Username: " USERNAME
+read -rsp "User password: " USERPASS
+echo
+read -rsp "Root password: " ROOTPASS
+echo
 
 # ------------------ Partitioning ------------------
-if [ "$WIPE_DISK" = true ]; then
-    wipefs --all --force "$disk0"
-    if [ "$boot" = "uefi" ]; then
-        echo -e "g\nn\n1\n\n+256M\nt\n1\nn\n\n\n\nw" | fdisk "$disk0"
-    else
-        echo -e "o\nn\np\n\n\n\nw" | fdisk "$disk0"
-    fi
-fi
+wipefs -a "$DISK"
+parted -s "$DISK" mklabel gpt
+parted -s "$DISK" mkpart ESP fat32 1MiB 257MiB
+parted -s "$DISK" set 1 boot on
+parted -s "$DISK" mkpart primary ext4 257MiB 100%
 
-sleep 2
+EFI_PART="${DISK}1"
+ROOT_PART="${DISK}2"
+[[ "$DISK" == *"nvme"* ]] && EFI_PART="${DISK}p1" && ROOT_PART="${DISK}p2"
 
-if [ "$boot" = "uefi" ]; then
-    EFI="${disk}1"
-    ROOT="${disk}2"
-    mkfs.fat -F32 "$EFI"
-    mkfs.ext4 -O fast_commit "$ROOT"
-    mount "$ROOT" /mnt
-    mkdir -p /mnt/boot/EFI
-    mount "$EFI" /mnt/boot/EFI
-else
-    ROOT="${disk}1"
-    mkfs.ext4 -O fast_commit "$ROOT"
-    mount "$ROOT" /mnt
-fi
+mkfs.fat -F32 "$EFI_PART"
+mkfs.ext4 -O fast_commit "$ROOT_PART"
 
-# ------------------ Swap ------------------
+mount "$ROOT_PART" /mnt
+mkdir -p /mnt/boot/EFI
+mount "$EFI_PART" /mnt/boot/EFI
+
+# ------------------ Swap File ------------------
 if [ "$SWAP_SIZE_GB" -gt 0 ]; then
     dd if=/dev/zero of=/mnt/swapfile bs=1G count="$SWAP_SIZE_GB" status=progress
     chmod 600 /mnt/swapfile
@@ -70,51 +50,63 @@ if [ "$SWAP_SIZE_GB" -gt 0 ]; then
     swapon /mnt/swapfile
 fi
 
-# ------------------ System Config ------------------
-echo "$HOSTNAME" > /mnt/etc/hostname
-echo "hostname=\"$HOSTNAME\"" > /mnt/etc/conf.d/hostname
-echo "$LOCALE" > /mnt/etc/locale.gen
-echo "$LANG" > /mnt/etc/locale.conf
-ln -sf "/usr/share/zoneinfo/$TIMEZONE" /mnt/etc/localtime
-
-# ------------------ Installation ------------------
-pacman -Sy --noconfirm
-basestrap /mnt $BASE_PKGS $DEV_PKGS $EXTRA_PKGS
+# ------------------ FSTAB ------------------
 fstabgen -U /mnt >> /mnt/etc/fstab
 
-mkdir -p /mnt/etc/sysctl.d
-echo "vm.swappiness=$((SWAP_SIZE_GB > 0 ? 10 : 0))" > /mnt/etc/sysctl.d/99-swap.conf
-echo "kernel.sysrq=244" > /mnt/etc/sysctl.d/35-sysrq.conf
+# ------------------ Pre-chroot Configuration ------------------
+echo "$LOCALE" > /mnt/etc/locale.gen
+echo "$LANG" > /mnt/etc/locale.conf
+echo "$TIMEZONE" > /mnt/etc/timezone
+echo "$USERNAME" > /mnt/etc/hostname
+echo "hostname='$USERNAME'" > /mnt/etc/conf.d/hostname
 
-if [ "$USE_IPV6_PRIVACY" = true ]; then
-    echo 'net.ipv6.conf.all.use_tempaddr = 2' > /mnt/etc/sysctl.d/40-ipv6.conf
-    for iface in /sys/class/net/*; do
-        echo "net.ipv6.conf.${iface##*/}.use_tempaddr = 2" >> /mnt/etc/sysctl.d/40-ipv6.conf
-    done
-fi
+# ------------------ Base Install ------------------
+basestrap /mnt $PACKAGES_BASE
 
-# ------------------ Chroot Configuration ------------------
-arch-chroot /mnt /bin/bash <<EOF
+# ------------------ Enter chroot ------------------
+cat <<EOF | artix-chroot /mnt /bin/bash
+
+# Timezone and Locale
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
 locale-gen
 hwclock --systohc
+
+# Enable NetworkManager
 rc-update add NetworkManager default
 
-if [ "$boot" = "uefi" ]; then
-    grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB
-else
-    grub-install --target=i386-pc "$disk0"
-fi
+# Set Root Password
+echo "root:$ROOTPASS" | chpasswd
 
+# User Setup
+useradd -m -g users -G wheel,uucp "$USERNAME"
+echo "$USERNAME:$USERPASS" | chpasswd
+
+# Basic sudo-like setup using doas
+pacman -S opendoas --noconfirm
+echo "permit persist :wheel" > /etc/doas.conf
+ln -sf /usr/bin/doas /usr/local/bin/sudo
+
+# Bootloader
+grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB --recheck
 grub-mkconfig -o /boot/grub/grub.cfg
 
-echo "root:$rootpw" | chpasswd
-useradd -m -G wheel "$username"
-echo "$username:$userpw" | chpasswd
+# Swap tuning
+if [ "$SWAP_SIZE_GB" -gt 0 ]; then
+    echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+else
+    echo 'vm.swappiness=0' > /etc/sysctl.d/99-swappiness.conf
+fi
 
-echo "permit persist :wheel" > /etc/doas.conf
-ln -s /usr/bin/doas /usr/local/bin/sudo
-rc-update add local default
+# Trim, hostname and other minimal settings
+echo 'kernel.sysrq = 244' > /etc/sysctl.d/35-sysrq.conf
+echo -e "#!/bin/sh\nfstrim -Av &" > /etc/local.d/99-trim.start
+chmod +x /etc/local.d/99-trim.start
+rc-update add local
+
 EOF
 
-# ------------------ Done ------------------
-echo "✅ Installation complete. Reboot after removing the installation media."
+# ------------------ Final Message ------------------
+echo -e "\n---------------------------------------------------"
+echo "Installation complete! You may now power off."
+echo "Remove the install media before rebooting."
+echo "---------------------------------------------------"
