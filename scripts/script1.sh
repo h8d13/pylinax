@@ -65,36 +65,26 @@ fi
 
 # === PARTITIONING ===
 if [ "$boot" == 1 ]; then
-    if [ "$wipe" == y ]; then
+    # UEFI system partitioning
+    if [ "$wipe" == "y" ]; then
         wipefs --all --force "$disk0"
-        echo "g
-n
-
-
-+256M
-t
-1
-n
-
-
-w" | fdisk "$disk0"
+        # Create GPT partition table, EFI partition, and root partition
+        echo -e "g\nn\n\n\n+256M\nEF00\nn\n\n\n\nw" | fdisk "$disk0"
     fi
-    mkfs.fat -F32 "${disk}1"
-    mkfs.ext4 "${disk}2"
-    mount "${disk}2" /mnt
+    mkfs.fat -F32 "${disk}1"  # EFI partition
+    mkfs.ext4 "${disk}2"       # Root partition
+    mount "${disk}2" /mnt      # Mount root partition
     mkdir -p /mnt/boot/EFI
-    mount "${disk}1" /mnt/boot/EFI
+    mount "${disk}1" /mnt/boot/EFI  # Mount EFI partition
 else
-    if [ "$wipe" == y ]; then
-        echo "o
-n
-p
-
-
-w" | fdisk "$disk0"
+    # BIOS system partitioning
+    if [ "$wipe" == "y" ]; then
+        wipefs --all --force "$disk0"
+        # Create MBR partition table and root partition
+        echo -e "o\nn\np\n\n\nw" | fdisk "$disk0"
     fi
-    mkfs.ext4 "${disk}1"
-    mount "${disk}1" /mnt
+    mkfs.ext4 "${disk}1"       # Root partition
+    mount "${disk}1" /mnt      # Mount root partition
 fi
 
 # === SWAP SETUP ===
