@@ -7,33 +7,32 @@ LOCALE="en_US.UTF-8 UTF-8"
 LANG="LANG=en_US.UTF-8"
 HOSTNAME="artix"
 SWAP_SIZE_GB=2
-WIPE_DISK=true  # Set to false to preserve existing partitions
+WIPE_DISK=true
 USE_IPV6_PRIVACY=true
 
-# Core packages
 BASE_PKGS="base openrc elogind-openrc linux linux-firmware git man-db iptables-nft"
 DEV_PKGS="base-devel bc"
 EXTRA_PKGS="networkmanager-openrc grub efibootmgr os-prober mtools dosfstools fastfetch htop neovim"
 
-# ------------------ Setup ------------------
+# ------------------ Pre-Setup ------------------
 loadkeys "$KEYMAP"
 echo "=== Minimal Artix Installer ==="
 
 fdisk -l
 read -rp "Target disk (e.g. /dev/sda): " disk
-read -rp "Continue and install to $disk? This will DESTROY DATA. (y/N): " confirm
+read -rp "Continue and install to $disk? This will ERASE ALL DATA. (y/N): " confirm
 [[ "${confirm,,}" != "y" ]] && exit 1
 
+read -rsp "Set root password: " rootpw; echo
 read -rp "New username: " username
-read -rsp "Password for $username: " userpassword; echo
+read -rsp "Password for $username: " userpw; echo
 
-# Normalize values
 username="${username,,}"
 HOSTNAME="${HOSTNAME,,}"
 disk0="$disk"
 [[ "$disk" =~ nvme0n|mmcblk ]] && disk="${disk}p"
 
-# Detect boot mode
+# ------------------ Boot Detection ------------------
 boot=legacy
 [ -d /sys/firmware/efi ] && boot=uefi
 
@@ -47,10 +46,8 @@ if [ "$WIPE_DISK" = true ]; then
     fi
 fi
 
-# Wait for partition table to settle
 sleep 2
 
-# Determine partitions
 if [ "$boot" = "uefi" ]; then
     EFI="${disk}1"
     ROOT="${disk}2"
@@ -73,22 +70,22 @@ if [ "$SWAP_SIZE_GB" -gt 0 ]; then
     swapon /mnt/swapfile
 fi
 
-# ------------------ Pre-config ------------------
+# ------------------ System Config ------------------
 echo "$HOSTNAME" > /mnt/etc/hostname
 echo "hostname=\"$HOSTNAME\"" > /mnt/etc/conf.d/hostname
 echo "$LOCALE" > /mnt/etc/locale.gen
 echo "$LANG" > /mnt/etc/locale.conf
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /mnt/etc/localtime
 
-# ------------------ Install ------------------
+# ------------------ Installation ------------------
 pacman -Sy --noconfirm
 basestrap /mnt $BASE_PKGS $DEV_PKGS $EXTRA_PKGS
 fstabgen -U /mnt >> /mnt/etc/fstab
 
-# Basic sysctl
 mkdir -p /mnt/etc/sysctl.d
 echo "vm.swappiness=$((SWAP_SIZE_GB > 0 ? 10 : 0))" > /mnt/etc/sysctl.d/99-swap.conf
 echo "kernel.sysrq=244" > /mnt/etc/sysctl.d/35-sysrq.conf
+
 if [ "$USE_IPV6_PRIVACY" = true ]; then
     echo 'net.ipv6.conf.all.use_tempaddr = 2' > /mnt/etc/sysctl.d/40-ipv6.conf
     for iface in /sys/class/net/*; do
@@ -96,11 +93,10 @@ if [ "$USE_IPV6_PRIVACY" = true ]; then
     done
 fi
 
-# ------------------ Chroot Setup ------------------
+# ------------------ Chroot Configuration ------------------
 arch-chroot /mnt /bin/bash <<EOF
 locale-gen
 hwclock --systohc
-
 rc-update add NetworkManager default
 
 if [ "$boot" = "uefi" ]; then
@@ -108,16 +104,17 @@ if [ "$boot" = "uefi" ]; then
 else
     grub-install --target=i386-pc "$disk0"
 fi
+
 grub-mkconfig -o /boot/grub/grub.cfg
 
+echo "root:$rootpw" | chpasswd
 useradd -m -G wheel "$username"
-echo "$username:$userpassword" | chpasswd
+echo "$username:$userpw" | chpasswd
 
 echo "permit persist :wheel" > /etc/doas.conf
 ln -s /usr/bin/doas /usr/local/bin/sudo
-
 rc-update add local default
 EOF
 
 # ------------------ Done ------------------
-echo "✅ Artix installation complete. You can now reboot."
+echo "✅ Installation complete. Reboot after removing the installation media."
