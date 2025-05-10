@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 
-# ------------------ Config Constants ------------------
+# ------------------ Configuration ------------------
 LOCALE="en_US.UTF-8 UTF-8"
 LANG="LANG=en_US.UTF-8"
-TIMEZONE="Europe/Berlin"
+TIMEZONE="Europe/London"
+HOSTNAME="artix"
 SWAP_SIZE_GB=2
-PACKAGES_BASE="base base-devel openrc elogind-openrc linux linux-firmware git man-db iptables-nft bc udev ntp networkmanager-openrc grub efibootmgr os-prober mtools dosfstools"
-USERNAME=""
-USERPASS=""
-ROOTPASS=""
+PACKAGES="base base-devel openrc elogind-openrc linux linux-firmware git man-db iptables-nft bc udev ntp networkmanager-openrc grub efibootmgr os-prober mtools dosfstools"
 
-# ------------------ Input: Disk, User, Passwords ------------------
+# ------------------ User Input ------------------
 loadkeys us
 clear
 echo "Available Disks:"
 lsblk -d -e7 -o NAME,SIZE,MODEL
-read -rp "Target disk (e.g. /dev/sda): " DISK
+read -rp "Target disk (e.g., /dev/sda): " DISK
 read -rp "Confirm you want to format $DISK (yes/NO): " CONFIRM
 [[ "$CONFIRM" != "yes" ]] && echo "Aborted." && exit 1
 read -rp "Username: " USERNAME
@@ -25,18 +23,39 @@ read -rsp "Root password: " ROOTPASS
 echo
 
 # ------------------ Partitioning ------------------
-wipefs -a "$DISK"
-parted -s "$DISK" mklabel gpt
-parted -s "$DISK" mkpart ESP fat32 1MiB 257MiB
-parted -s "$DISK" set 1 boot on
-parted -s "$DISK" mkpart primary ext4 257MiB 100%
+fdisk "$DISK" <<EOF
+g
+n
+
+
++512M
+t
+1
+n
+
+
++${SWAP_SIZE_GB}G
+t
+2
+n
+
+
++100%
+t
+3
+w
+EOF
+
+sleep 2
 
 EFI_PART="${DISK}1"
-ROOT_PART="${DISK}2"
-[[ "$DISK" == *"nvme"* ]] && EFI_PART="${DISK}p1" && ROOT_PART="${DISK}p2"
+SWAP_PART="${DISK}2"
+ROOT_PART="${DISK}3"
 
 mkfs.fat -F32 "$EFI_PART"
 mkfs.ext4 -O fast_commit "$ROOT_PART"
+mkswap "$SWAP_PART"
+swapon "$SWAP_PART"
 
 mount "$ROOT_PART" /mnt
 mkdir -p /mnt/boot/EFI
@@ -57,13 +76,13 @@ fstabgen -U /mnt >> /mnt/etc/fstab
 echo "$LOCALE" > /mnt/etc/locale.gen
 echo "$LANG" > /mnt/etc/locale.conf
 echo "$TIMEZONE" > /mnt/etc/timezone
-echo "$USERNAME" > /mnt/etc/hostname
-echo "hostname='$USERNAME'" > /mnt/etc/conf.d/hostname
+echo "$HOSTNAME" > /mnt/etc/hostname
+echo "hostname=\"$HOSTNAME\"" > /mnt/etc/conf.d/hostname
 
-# ------------------ Base Install ------------------
-basestrap /mnt $PACKAGES_BASE
+# ------------------ Base Installation ------------------
+basestrap /mnt $PACKAGES
 
-# ------------------ Enter chroot ------------------
+# ------------------ Chroot Configuration ------------------
 cat <<EOF | artix-chroot /mnt /bin/bash
 
 # Timezone and Locale
