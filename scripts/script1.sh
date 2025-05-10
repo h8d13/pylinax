@@ -1,131 +1,157 @@
 #!/usr/bin/env bash
 
-# ------------------ Configuration ------------------
-LOCALE="en_US.UTF-8 UTF-8"
-LANG="LANG=en_US.UTF-8"
-TIMEZONE="Europe/London"
-HOSTNAME="artix"
-SWAP_SIZE_GB=2
-PACKAGES="base base-devel openrc elogind-openrc linux linux-firmware git man-db iptables-nft bc udev ntp networkmanager-openrc grub efibootmgr os-prober mtools dosfstools"
+# === CONSTANTS ===
+KEYMAP="us"
+BASE_DEVEL_PKGS="db diffutils gc guile libisl libmpc perl autoconf automake bash dash binutils bison esysusers etmpfiles fakeroot file findutils flex gawk gcc gettext grep groff gzip libtool m4 make pacman pacman-contrib patch pkgconf sed opendoas texinfo which bc udev ntp"
+KERNEL_PKGS="linux linux-firmware"
+NETWORK_PKG="networkmanager-openrc"
+BOOTLOADER_PKGS="grub efibootmgr os-prober mtools dosfstools"
+DEFAULT_LANG="en_US.UTF-8"
 
-# ------------------ User Input ------------------
-loadkeys us
-clear
-echo "Available Disks:"
-lsblk -d -e7 -o NAME,SIZE,MODEL
-read -rp "Target disk (e.g., /dev/sda): " DISK
-read -rp "Confirm you want to format $DISK (yes/NO): " CONFIRM
-[[ "$CONFIRM" != "yes" ]] && echo "Aborted." && exit 1
-read -rp "Username: " USERNAME
-read -rsp "User password: " USERPASS
-echo
-read -rsp "Root password: " ROOTPASS
-echo
+# === INITIAL SETUP ===
+loadkeys "$KEYMAP"
+echo "--------------------------------------------------------------"
+echo "Artix Base Installer (Simplified)"
+echo "Last updated: 2025-04-06"
+echo "--------------------------------------------------------------"
+read -n 1 -s -r -p "Press any key to begin..."
 
-# ------------------ Partitioning ------------------
-fdisk "$DISK" <<EOF
-g
+# === BASIC QUESTIONS ===
+echo -e "\nChoose Form Factor:\n1. Laptop\n2. Desktop\n3. Headless"
+read -rp "Formfactor: " formfactor
+
+fdisk -l
+read -rp "Target Disk: " disk
+read -rp "Swap Size (in GB): " swap
+read -n 1 -rp "Wipe Disk? (y/N): " wipe
+echo
+read -rp "Username: " username
+read -rp "Password for $username: " userpassword
+read -rp "Hostname: " hostname
+
+# === TIMEZONE CONFIG ===
+zroot=/usr/share/zoneinfo
+while true; do
+    echo "Available Timezones:"
+    ls "$zroot"
+    read -rp "Timezone (Region/City): " timezone
+    if [ -f "$zroot/$timezone" ]; then
+        break
+    else
+        echo "Invalid timezone. Try again."
+    fi
+done
+
+# === SYSTEM DETECTION ===
+pacman -Sy --noconfirm bc
+threadsminusone=$(echo "$(nproc) - 1" | bc)
+
+# UEFI or BIOS?
+if [ -d "/sys/firmware/efi" ]; then
+    boot=1
+else
+    boot=2
+fi
+
+# === VARIABLE NORMALIZATION ===
+wipe=$(echo "$wipe" | tr '[:upper:]' '[:lower:]')
+username=$(echo "$username" | tr '[:upper:]' '[:lower:]')
+hostname=$(echo "$hostname" | tr '[:upper:]' '[:lower:]')
+
+disk0=$disk
+if [[ "$disk" == /dev/nvme0n* || "$disk" == /dev/mmcblk* ]]; then
+    disk="$disk"'p'
+fi
+
+# === PARTITIONING ===
+if [ "$boot" == 1 ]; then
+    if [ "$wipe" == y ]; then
+        wipefs --all --force "$disk0"
+        echo "g
 n
 
 
-+512M
++256M
 t
 1
 n
 
 
-+${SWAP_SIZE_GB}G
-t
-2
+w" | fdisk "$disk0"
+    fi
+    mkfs.fat -F32 "${disk}1"
+    mkfs.ext4 "${disk}2"
+    mount "${disk}2" /mnt
+    mkdir -p /mnt/boot/EFI
+    mount "${disk}1" /mnt/boot/EFI
+else
+    if [ "$wipe" == y ]; then
+        echo "o
 n
+p
 
 
-+100%
-t
-3
-w
-EOF
+w" | fdisk "$disk0"
+    fi
+    mkfs.ext4 "${disk}1"
+    mount "${disk}1" /mnt
+fi
 
-sleep 2
-
-EFI_PART="${DISK}1"
-SWAP_PART="${DISK}2"
-ROOT_PART="${DISK}3"
-
-mkfs.fat -F32 "$EFI_PART"
-mkfs.ext4 -O fast_commit "$ROOT_PART"
-mkswap "$SWAP_PART"
-swapon "$SWAP_PART"
-
-mount "$ROOT_PART" /mnt
-mkdir -p /mnt/boot/EFI
-mount "$EFI_PART" /mnt/boot/EFI
-
-# ------------------ Swap File ------------------
-if [ "$SWAP_SIZE_GB" -gt 0 ]; then
-    dd if=/dev/zero of=/mnt/swapfile bs=1G count="$SWAP_SIZE_GB" status=progress
+# === SWAP SETUP ===
+if [ "$swap" -gt 0 ]; then
+    dd if=/dev/zero of=/mnt/swapfile bs=1G count="$swap" status=progress
     chmod 600 /mnt/swapfile
     mkswap /mnt/swapfile
     swapon /mnt/swapfile
 fi
 
-# ------------------ FSTAB ------------------
+# === SYSTEM CONFIG ===
+echo "$hostname" > /mnt/etc/hostname
+echo "127.0.0.1 localhost" > /mnt/etc/hosts
+mkdir -p /mnt/etc/conf.d
+echo "hostname=\"$hostname\"" > /mnt/etc/conf.d/hostname
+ln -sf "/usr/share/zoneinfo/$timezone" /mnt/etc/localtime
+echo "$DEFAULT_LANG UTF-8" > /mnt/etc/locale.gen
+echo "LANG=$DEFAULT_LANG" > /mnt/etc/locale.conf
+
+# === INSTALL BASE SYSTEM ===
 fstabgen -U /mnt >> /mnt/etc/fstab
+basestrap /mnt base $BASE_DEVEL_PKGS $KERNEL_PKGS openrc elogind-openrc git man-db iptables-nft
 
-# ------------------ Pre-chroot Configuration ------------------
-echo "$LOCALE" > /mnt/etc/locale.gen
-echo "$LANG" > /mnt/etc/locale.conf
-echo "$TIMEZONE" > /mnt/etc/timezone
-echo "$HOSTNAME" > /mnt/etc/hostname
-echo "hostname=\"$HOSTNAME\"" > /mnt/etc/conf.d/hostname
+# === NETWORKING ===
+basestrap /mnt $NETWORK_PKG
+artix-chroot /mnt rc-update add NetworkManager
 
-# ------------------ Base Installation ------------------
-basestrap /mnt $PACKAGES
+# === USER SETUP ===
+artix-chroot /mnt groupadd libvirt
+artix-chroot /mnt useradd -m -g users -G wheel,uucp,libvirt "$username"
+echo "$username:$userpassword" | artix-chroot /mnt chpasswd
+echo "permit persist keepenv :wheel as root" > /mnt/etc/doas.conf
+ln -s /usr/bin/doas /mnt/usr/local/bin/sudo
 
-# ------------------ Chroot Configuration ------------------
-cat <<EOF | artix-chroot /mnt /bin/bash
+# === LOCALE & TIME ===
+artix-chroot /mnt locale-gen
 
-# Timezone and Locale
-ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
-locale-gen
-hwclock --systohc
-
-# Enable NetworkManager
-rc-update add NetworkManager default
-
-# Set Root Password
-echo "root:$ROOTPASS" | chpasswd
-
-# User Setup
-useradd -m -g users -G wheel,uucp "$USERNAME"
-echo "$USERNAME:$USERPASS" | chpasswd
-
-# Basic sudo-like setup using doas
-pacman -S opendoas --noconfirm
-echo "permit persist :wheel" > /etc/doas.conf
-ln -sf /usr/bin/doas /usr/local/bin/sudo
-
-# Bootloader
-grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB --recheck
-grub-mkconfig -o /boot/grub/grub.cfg
-
-# Swap tuning
-if [ "$SWAP_SIZE_GB" -gt 0 ]; then
-    echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+# === BOOTLOADER INSTALL ===
+basestrap /mnt $BOOTLOADER_PKGS
+if [ "$boot" == 1 ]; then
+    artix-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB
 else
-    echo 'vm.swappiness=0' > /etc/sysctl.d/99-swappiness.conf
+    artix-chroot /mnt grub-install --target=i386-pc "$disk0"
+fi
+artix-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+
+# === SYSCTL TUNING ===
+echo 'kernel.sysrq = 244' > /mnt/etc/sysctl.d/35-sysrq.conf
+echo -e 'net.ipv6.conf.all.use_tempaddr = 2\nnet.ipv6.conf.default.use_tempaddr = 2' > /mnt/etc/sysctl.d/40-ipv6.conf
+
+if [ "$swap" -gt 0 ]; then
+    echo 'vm.swappiness=10' > /mnt/etc/sysctl.d/99-swappiness.conf
+else
+    echo 'vm.swappiness=0' > /mnt/etc/sysctl.d/99-swappiness.conf
 fi
 
-# Trim, hostname and other minimal settings
-echo 'kernel.sysrq = 244' > /etc/sysctl.d/35-sysrq.conf
-echo -e "#!/bin/sh\nfstrim -Av &" > /etc/local.d/99-trim.start
-chmod +x /etc/local.d/99-trim.start
-rc-update add local
-
-EOF
-
-# ------------------ Final Message ------------------
-echo -e "\n---------------------------------------------------"
-echo "Installation complete! You may now power off."
-echo "Remove the install media before rebooting."
-echo "---------------------------------------------------"
+# === FINALIZATION ===
+artix-chroot /mnt rc-update add local
+echo -e "\nInstallation complete!"
+echo "You may now power off, remove installation media, and reboot into your new system."
